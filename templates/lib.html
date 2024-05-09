@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Expense Management</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='st.css') }}">
+</head>
+<body>
+    <h1>Expense Tracker</h1>
+
+    <!-- Display list of expenses -->
+    <h2>All Expenses</h2>
+    <ul>
+        {% for expense in expenses %}
+        <li>ID: {{ expense[0] }}, Name: {{ expense[1] }}, Amount: {{ expense[2] }}</li>
+        {% endfor %}
+    </ul>
+
+    <!-- Add a new expense-->
+    <h2>Add Expense</h2>
+    <form action="{{ url_for('add_expense') }}" method="POST">
+        Name: <input type="text" name="Name" required><br>
+        Amount: <input type="number" name="amount" required><br>
+        <input type="submit" value="Add Expense">
+    </form>
+
+    <!-- Update an expense-->
+    <h2>Update Expense</h2>
+    <form action="{{ url_for('update_expense') }}" method="POST">
+        ID: <input type="number" name="id" required><br>
+        Name: <input type="text" name="Name"><br>
+        Amount: <input type="number" name="amount"><br>
+        <input type="submit" value="Update Expense">
+    </form>
+
+    <!-- Delete an expense -->
+    <h2>Delete Expense</h2>
+    <form action="{{ url_for('delete_expense') }}" method="POST">
+        ID: <input type="number" name="id" required><br>
+        <input type="submit" value="Delete Expense">
+    </form>
+
+    <!-- Search for expense -->
+    <h2>Search Expense</h2>
+    <form action="{{ url_for('search_expense') }}" method="GET">
+        Query: <input type="text" name="query">
+        <input type="submit" value="Search">
+    </form>
+
+    <!-- Display search results -->
+    {% if results %}
+    <h2>Search Results for "{{ query }}"</h2>
+    <ul>
+        {% for result in results %}
+        <li>ID: {{ result[0] }}, Name: {{ result[1] }}, Amount: {{ result[2] }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</body>
+</html>
