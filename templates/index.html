@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A clean Flask and SQLite expense tracker with CRUD, search, filters, summaries, and CSV export.">
+    <meta name="theme-color" content="#111827">
+    <title>Expense Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <header class="topbar container">
+        <a class="brand" href="{{ url_for('home') }}" aria-label="Expense Tracker home">
+            <span class="brand-mark" aria-hidden="true">₹</span>
+            <span>
+                <strong>Expense Tracker</strong>
+                <small>Flask + SQLite</small>
+            </span>
+        </a>
+        <div class="topbar-actions">
+            <a class="button button-ghost" href="{{ url_for('export_csv') }}">Export CSV</a>
+            <button class="icon-button" id="theme-toggle" type="button" aria-label="Toggle color theme" title="Toggle theme">
+                <span class="theme-icon" aria-hidden="true">◐</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="container page-shell">
+        <section class="hero reveal">
+            <div>
+                <p class="eyebrow">Personal spending, simplified</p>
+                <h1>Know where your money goes.</h1>
+                <p class="hero-copy">Track everyday expenses, search your history, understand category spending, and export your data whenever you need it.</p>
+            </div>
+            <div class="hero-badge" aria-label="Local-first storage">
+                <span class="status-dot"></span>
+                Stored locally with SQLite
+            </div>
+        </section>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="toast-stack" aria-live="polite">
+                    {% for category, message in messages %}
+                        <div class="toast toast-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <section class="stats-grid reveal" aria-label="Expense summary">
+            <article class="stat-card stat-featured">
+                <span class="stat-label">Total tracked</span>
+                <strong>{{ stats.total|inr }}</strong>
+                <span class="stat-meta">Across {{ stats.count }} expense{% if stats.count != 1 %}s{% endif %}</span>
+            </article>
+            <article class="stat-card">
+                <span class="stat-label">This month</span>
+                <strong>{{ stats.month_total|inr }}</strong>
+                <span class="stat-meta">Current month spend</span>
+            </article>
+            <article class="stat-card">
+                <span class="stat-label">Average expense</span>
+                <strong>{{ stats.average|inr }}</strong>
+                <span class="stat-meta">Per transaction</span>
+            </article>
+            <article class="stat-card">
+                <span class="stat-label">Largest expense</span>
+                <strong>{{ stats.largest|inr }}</strong>
+                <span class="stat-meta">Highest single entry</span>
+            </article>
+        </section>
+
+        <section class="workspace-grid">
+            <aside class="panel add-panel reveal">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Quick entry</p>
+                        <h2>Add an expense</h2>
+                    </div>
+                </div>
+
+                <form class="expense-form" action="{{ url_for('add_expense') }}" method="post">
+                    <label>
+                        <span>Expense name</span>
+                        <input type="text" name="name" maxlength="80" placeholder="e.g. Lunch at campus" required autocomplete="off">
+                    </label>
+                    <div class="form-row">
+                        <label>
+                            <span>Amount</span>
+                            <div class="money-input">
+                                <span>₹</span>
+                                <input type="number" name="amount" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required>
+                            </div>
+                        </label>
+                        <label>
+                            <span>Date</span>
+                            <input type="date" name="expense_date" max="{{ today }}" value="{{ today }}" required>
+                        </label>
+                    </div>
+                    <label>
+                        <span>Category</span>
+                        <select name="category" required>
+                            {% for category in categories %}
+                                <option value="{{ category }}">{{ category }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>
+                        <span>Notes <em>optional</em></span>
+                        <textarea name="notes" maxlength="240" rows="3" placeholder="Add a short note"></textarea>
+                    </label>
+                    <button class="button button-primary button-block" type="submit">Add expense</button>
+                </form>
+            </aside>
+
+            <div class="main-column">
+                <section class="panel reveal">
+                    <div class="section-heading split-heading">
+                        <div>
+                            <p class="eyebrow">Overview</p>
+                            <h2>Top categories</h2>
+                        </div>
+                        <span class="section-note">By total spend</span>
+                    </div>
+
+                    {% if category_breakdown %}
+                        <div class="category-bars">
+                            {% for item in category_breakdown %}
+                                <div class="category-row">
+                                    <div class="category-row-top">
+                                        <span>{{ item.category }}</span>
+                                        <strong>{{ item.total|inr }}</strong>
+                                    </div>
+                                    <div class="bar-track" aria-label="{{ item.category }} {{ item.percent }} percent">
+                                        <span class="bar-fill" style="--bar-width: {{ item.percent }}%"></span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="mini-empty">Add your first expense to see category insights.</div>
+                    {% endif %}
+                </section>
+
+                <section class="panel reveal expenses-panel">
+                    <div class="section-heading split-heading">
+                        <div>
+                            <p class="eyebrow">History</p>
+                            <h2>Your expenses</h2>
+                        </div>
+                        <span class="results-count">{{ expenses|length }} shown</span>
+                    </div>
+
+                    <form class="filter-bar" method="get" action="{{ url_for('home') }}">
+                        <label class="search-box">
+                            <span class="sr-only">Search expenses</span>
+                            <span class="search-symbol" aria-hidden="true">⌕</span>
+                            <input type="search" name="q" value="{{ query }}" placeholder="Search expenses or notes">
+                        </label>
+                        <label>
+                            <span class="sr-only">Filter by category</span>
+                            <select name="category">
+                                <option value="">All categories</option>
+                                {% for category in categories %}
+                                    <option value="{{ category }}" {% if selected_category == category %}selected{% endif %}>{{ category }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>
+                            <span class="sr-only">Sort expenses</span>
+                            <select name="sort">
+                                <option value="newest" {% if selected_sort == 'newest' %}selected{% endif %}>Newest first</option>
+                                <option value="oldest" {% if selected_sort == 'oldest' %}selected{% endif %}>Oldest first</option>
+                                <option value="highest" {% if selected_sort == 'highest' %}selected{% endif %}>Highest amount</option>
+                                <option value="lowest" {% if selected_sort == 'lowest' %}selected{% endif %}>Lowest amount</option>
+                            </select>
+                        </label>
+                        <button class="button button-secondary" type="submit">Apply</button>
+                        {% if query or selected_category or selected_sort != 'newest' %}
+                            <a class="button button-ghost" href="{{ url_for('home') }}">Reset</a>
+                        {% endif %}
+                    </form>
+
+                    {% if expenses %}
+                        <div class="expense-list">
+                            {% for expense in expenses %}
+                                <article class="expense-card">
+                                    <div class="expense-category-icon" data-category="{{ expense.category }}" aria-hidden="true">{{ expense.category[0] }}</div>
+                                    <div class="expense-main">
+                                        <div class="expense-title-row">
+                                            <div>
+                                                <h3>{{ expense.name }}</h3>
+                                                <p>{{ expense.category }} · {{ expense.expense_date }}</p>
+                                            </div>
+                                            <strong class="expense-amount">{{ expense.amount|inr }}</strong>
+                                        </div>
+                                        {% if expense.notes %}
+                                            <p class="expense-notes">{{ expense.notes }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="expense-actions">
+                                        <button
+                                            class="text-button edit-button"
+                                            type="button"
+                                            data-id="{{ expense.id }}"
+                                            data-name="{{ expense.name }}"
+                                            data-amount="{{ '%.2f'|format(expense.amount) }}"
+                                            data-category="{{ expense.category }}"
+                                            data-date="{{ expense.expense_date }}"
+                                            data-notes="{{ expense.notes }}"
+                                        >Edit</button>
+                                        <form action="{{ url_for('delete_expense', expense_id=expense.id) }}" method="post" data-delete-form data-name="{{ expense.name }}">
+                                            <button class="text-button danger-text" type="submit">Delete</button>
+                                        </form>
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <div class="empty-icon" aria-hidden="true">₹</div>
+                            <h3>No expenses found</h3>
+                            <p>{% if query or selected_category %}Try a different search or filter.{% else %}Add your first expense and your dashboard will come to life.{% endif %}</p>
+                        </div>
+                    {% endif %}
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <dialog class="edit-dialog" id="edit-dialog">
+        <form class="dialog-card expense-form" id="edit-form" method="post">
+            <div class="dialog-header">
+                <div>
+                    <p class="eyebrow">Update entry</p>
+                    <h2>Edit expense</h2>
+                </div>
+                <button class="icon-button" id="dialog-close" type="button" aria-label="Close edit dialog">×</button>
+            </div>
+            <label>
+                <span>Expense name</span>
+                <input id="edit-name" type="text" name="name" maxlength="80" required>
+            </label>
+            <div class="form-row">
+                <label>
+                    <span>Amount</span>
+                    <div class="money-input">
+                        <span>₹</span>
+                        <input id="edit-amount" type="number" name="amount" min="0.01" step="0.01" required>
+                    </div>
+                </label>
+                <label>
+                    <span>Date</span>
+                    <input id="edit-date" type="date" name="expense_date" max="{{ today }}" required>
+                </label>
+            </div>
+            <label>
+                <span>Category</span>
+                <select id="edit-category" name="category" required>
+                    {% for category in categories %}
+                        <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Notes <em>optional</em></span>
+                <textarea id="edit-notes" name="notes" maxlength="240" rows="3"></textarea>
+            </label>
+            <div class="dialog-actions">
+                <button class="button button-ghost" id="dialog-cancel" type="button">Cancel</button>
+                <button class="button button-primary" type="submit">Save changes</button>
+            </div>
+        </form>
+    </dialog>
+
+    <footer class="container footer">
+        <p>Built with Python, Flask, SQLite, Jinja2, HTML, CSS, and vanilla JavaScript.</p>
+    </footer>
+</body>
+</html>
