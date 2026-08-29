@@ -10,7 +10,8 @@ from pathlib import Path
 from flask import Flask, Response, flash, g, redirect, render_template, request, url_for
 
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_DB_PATH = BASE_DIR / "instance" / "expenses.db"
+LEGACY_DB_PATH = BASE_DIR / "expense.db"
+DEFAULT_DB_PATH = LEGACY_DB_PATH if LEGACY_DB_PATH.exists() else BASE_DIR / "instance" / "expenses.db"
 CATEGORIES = (
     "Food",
     "Transport",

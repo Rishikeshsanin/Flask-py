@@ -36,7 +36,7 @@ Expense Tracker is a full CRUD web app built with Flask and SQLite. It started a
 
 ---
 
-## 📸 Interface previews
+## 📸 Screenshots
 
 ### Light theme
 
