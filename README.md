@@ -91,8 +91,8 @@ No frontend framework or heavy UI library is required.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Rishikeshsanin/Flask-py.git
-cd Flask-py
+git clone https://github.com/Rishikeshsanin/flask-expense-tracker.git
+cd flask-expense-tracker
 ```
 
 ### 2. Create a virtual environment
